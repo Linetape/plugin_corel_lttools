@@ -9,7 +9,7 @@ using Microsoft.Win32;
 [assembly: AssemblyTitle("LT Tools - Instalador")]
 [assembly: AssemblyProduct("LT Tools para CorelDRAW")]
 [assembly: AssemblyCompany("Line Tape Iluminação e Locação")]
-[assembly: AssemblyVersion("2.5.0.0")]
+[assembly: AssemblyVersion("2.6.0.0")]
 
 static class Instalador
 {
@@ -18,7 +18,7 @@ static class Instalador
     [STAThread]
     static void Main()
     {
-        if (MessageBox.Show("Instalar o LT Tools 2.5 no CorelDRAW?\n\nO CorelDRAW precisa estar FECHADO.",
+        if (MessageBox.Show("Instalar o LT Tools 2.6 no CorelDRAW?\n\nO CorelDRAW precisa estar FECHADO.",
                             T, MessageBoxButtons.OKCancel, MessageBoxIcon.Question) != DialogResult.OK) return;
 
         while (Process.GetProcessesByName("CorelDRW").Length > 0)
