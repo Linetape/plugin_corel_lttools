@@ -1,0 +1,57 @@
+LT TOOLS - barra de ferramentas para CorelDRAW
+Line Tape Iluminação e Locação
+==============================================
+
+ATUALIZAR (versões novas)
+  1) Extraia o ZIP novo no C:\ e escolha "Substituir os arquivos".
+  2) Clique no botão verde "Atualizar" da barra LT Tools.
+  3) Se a versão nova tiver ícones novos, rode LT_InstalarBarra.
+
+INSTALAÇÃO (uma vez só)
+
+1) Extraia este ZIP direto no C:\
+   Tem que ficar assim:  C:\LTTools\icones\logo.ico
+   (se colocar em outra pasta, o LT_InstalarBarra pergunta onde está)
+
+2) No CorelDRAW, abra o editor de scripts (Alt+F11).
+   - Se já existir o módulo LTTools da versão anterior:
+     botão direito em LTTools > Remover LTTools > Não (não exportar).
+   - Botão direito em GlobalMacros > Import File... > C:\LTTools\LTTools.bas
+   - Repita o Import File... com C:\LTTools\LTUpdate.bas (o atualizador)
+
+3) Crie a janela do plugin:
+   - Com GlobalMacros selecionado: menu Inserir > UserForm
+   - Na janela Propriedades (F4), troque o (Name) de "UserForm1" para:  frmLT
+   - Clique com o botão direito no frmLT > Exibir código
+   - Apague o que estiver lá, abra C:\LTTools\frmLT_codigo.txt no Bloco de Notas,
+     copie TUDO (Ctrl+A, Ctrl+C) e cole (Ctrl+V) na janela de código.
+   - NÃO precisa desenhar nada no formulário: ele se monta sozinho.
+
+4) Menu Depurar > Compilar GlobalMacros  (não deve aparecer erro)
+   Salve com Ctrl+S e feche o editor.
+
+5) No CorelDRAW: Ferramentas > Scripts > Executar script
+   Macros em: GlobalMacros  >  LT_InstalarBarra  >  Executar
+   A barra "LT Tools" aparece flutuando. Arraste para junto das outras barras.
+
+USO
+
+  [LT]  menu geral
+  Régua ........ Medição e orçamento
+  Peças ........ Encaixe e otimização
+  Curva/nós .... Plotter, laser e CNC
+  Letra L ...... Letra caixa, LED e neon
+  Cubo ......... Geradores (caixa, quebra-cabeça, grelha, numeração)
+  Seleção ...... Edição de objetos
+
+  Clique no ícone -> abre a lista de ferramentas embaixo do mouse ->
+  clique na ferramenta -> abre a janela com os campos -> OK.
+  Esc fecha o menu. As janelas lembram os últimos valores usados.
+  Tudo se desfaz com um Ctrl+Z.
+
+SE A BARRA NÃO FOR CRIADA AUTOMATICAMENTE
+  Ferramentas > Opções > Personalização > Barras de comando > Novo ("LT Tools")
+  Em Comandos > Scripts, arraste para a barra:
+  LT_Menu, LT_Medicao, LT_Encaixe, LT_Corte, LT_LetraCaixaLED, LT_Geradores, LT_Edicao
+  Em cada botão: Aparência > Importar > escolha o .ico da pasta C:\LTTools\icones
+  (logo, cat_medicao, cat_encaixe, cat_corte, cat_letracaixa, cat_geradores, cat_edicao)

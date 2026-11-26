@@ -1,0 +1,711 @@
+'==============================================================================
+'  LT TOOLS - código do formulário frmLT
+'  Cole TODO este texto na janela de código do UserForm "frmLT".
+'  O formulário monta sozinho os campos e os menus - não precisa desenhar nada.
+'==============================================================================
+Option Explicit
+
+Private Type PONTO
+    X As Long
+    Y As Long
+End Type
+
+#If VBA7 Then
+    Private Declare PtrSafe Function GetCursorPos Lib "user32" (lpPoint As PONTO) As Long
+    Private Declare PtrSafe Function GetDC Lib "user32" (ByVal hwnd As LongPtr) As LongPtr
+    Private Declare PtrSafe Function ReleaseDC Lib "user32" (ByVal hwnd As LongPtr, ByVal hdc As LongPtr) As Long
+    Private Declare PtrSafe Function GetDeviceCaps Lib "gdi32" (ByVal hdc As LongPtr, ByVal nIndex As Long) As Long
+#Else
+    Private Declare Function GetCursorPos Lib "user32" (lpPoint As PONTO) As Long
+    Private Declare Function GetDC Lib "user32" (ByVal hwnd As Long) As Long
+    Private Declare Function ReleaseDC Lib "user32" (ByVal hwnd As Long, ByVal hdc As Long) As Long
+    Private Declare Function GetDeviceCaps Lib "gdi32" (ByVal hdc As Long, ByVal nIndex As Long) As Long
+#End If
+
+Private Const COR_FUNDO As Long = &HFFFFFF        ' branco
+Private Const COR_HOVER As Long = &HF7E3CC        ' azul claro (BGR)
+Private Const COR_BORDA As Long = &HE8A866
+
+Private WithEvents bOK As MSForms.CommandButton
+Private WithEvents bCanc As MSForms.CommandButton
+Private WithEvents cbPre As MSForms.ComboBox
+Private WithEvents bSalvarPre As MSForms.CommandButton
+Private WithEvents bExcluirPre As MSForms.CommandButton
+Private WithEvents bPadraoPre As MSForms.CommandButton
+Private carregando As Boolean
+Private WithEvents s1 As MSForms.SpinButton
+Private WithEvents s2 As MSForms.SpinButton
+Private WithEvents s3 As MSForms.SpinButton
+Private WithEvents s4 As MSForms.SpinButton
+Private WithEvents s5 As MSForms.SpinButton
+Private WithEvents s6 As MSForms.SpinButton
+Private WithEvents s7 As MSForms.SpinButton
+Private WithEvents s8 As MSForms.SpinButton
+Private WithEvents s9 As MSForms.SpinButton
+Private WithEvents s10 As MSForms.SpinButton
+Private WithEvents m1 As MSForms.Label
+Private WithEvents m2 As MSForms.Label
+Private WithEvents m3 As MSForms.Label
+Private WithEvents m4 As MSForms.Label
+Private WithEvents m5 As MSForms.Label
+Private WithEvents m6 As MSForms.Label
+Private WithEvents m7 As MSForms.Label
+Private WithEvents m8 As MSForms.Label
+Private WithEvents m9 As MSForms.Label
+Private WithEvents m10 As MSForms.Label
+
+Private ctl(1 To 16) As Object      ' controle de valor de cada campo
+Private dx As Single                ' deslocamento dos campos (modo com visualização)
+Private WithEvents bVer As MSForms.CommandButton
+Private imgPrev As MSForms.Image, lblInfo As MSForms.Label, jaAtivou As Boolean
+Private passo(1 To 16) As Double
+Private itm(1 To 16) As Object      ' rótulos do menu (recebem o clique)
+Private fundo(1 To 16) As Object    ' fundo de cada item (muda de cor no mouse)
+Private nItens As Long
+
+'------------------------------------------------------------------------------
+Private Sub UserForm_Initialize()
+    Me.Font.Name = "Segoe UI"
+    Me.Font.Size = 9
+    Me.BackColor = COR_FUNDO
+    If gModo = 2 Then MontarMenu Else MontarJanela
+End Sub
+
+Private Sub UserForm_QueryClose(Cancel As Integer, CloseMode As Integer)
+    If CloseMode = vbFormControlMenu Then
+        Cancel = True
+        gOK = False: gMenuEscolha = 0
+        Me.Hide
+    End If
+End Sub
+
+'==============================================================================
+'  MENU (lista de ferramentas com ícone, abre embaixo do mouse)
+'==============================================================================
+Private Sub MontarMenu()
+    Dim i As Long, y As Single, l As MSForms.Label, larg As Single
+    Me.Caption = "LT Tools - " & gTit
+    larg = 250
+    y = 4
+    nItens = gMenuN
+    For i = 1 To gMenuN
+        ' 1) fundo (para o destaque), 2) ícone, 3) texto por cima (transparente)
+        Set fundo(i) = Me.Controls.Add("Forms.Label.1", "fundo" & i)
+        With fundo(i)
+            .Left = 3: .Top = y: .Width = larg - 6: .Height = 22
+            .BackStyle = fmBackStyleOpaque: .BackColor = COR_FUNDO
+            .BorderStyle = fmBorderStyleNone: .Caption = ""
+        End With
+        CarregarIcone i, 8, y + 2
+        Set l = Me.Controls.Add("Forms.Label.1", "item" & i)
+        With l
+            .Left = 32: .Top = y + 4: .Width = larg - 35: .Height = 18
+            .Caption = gMenuTxt(i)
+            .Font.Name = "Segoe UI": .Font.Size = 9
+            .BackStyle = fmBackStyleTransparent
+            .BorderStyle = fmBorderStyleNone
+            .TextAlign = fmTextAlignLeft
+        End With
+        Set itm(i) = l
+        Select Case i
+            Case 1: Set m1 = l
+            Case 2: Set m2 = l
+            Case 3: Set m3 = l
+            Case 4: Set m4 = l
+            Case 5: Set m5 = l
+            Case 6: Set m6 = l
+            Case 7: Set m7 = l
+            Case 8: Set m8 = l
+            Case 9: Set m9 = l
+            Case 10: Set m10 = l
+        End Select
+        y = y + 23
+    Next
+    ' botão invisível só para fechar com Esc
+    Set bCanc = Me.Controls.Add("Forms.CommandButton.1", "btnCanc")
+    bCanc.Left = -200: bCanc.Top = 0: bCanc.Width = 10: bCanc.Height = 10
+    bCanc.Cancel = True
+    Me.Width = larg + (Me.Width - Me.InsideWidth)
+    Me.Height = y + 4 + (Me.Height - Me.InsideHeight)
+    PosicionarNoMouse
+End Sub
+
+Private Sub CarregarIcone(ByVal i As Long, ByVal x As Single, ByVal y As Single)
+    Dim bmp As String, im As MSForms.Image, arq As String
+    arq = gMenuIco(i)
+    bmp = Left$(arq, Len(arq) - 4) & ".bmp"      ' BMP é o formato mais seguro para o VBA
+    If Len(Dir$(bmp)) = 0 Then bmp = arq
+    If Len(Dir$(bmp)) = 0 Then Exit Sub
+    Set im = Me.Controls.Add("Forms.Image.1", "ico" & i)
+    With im
+        .Left = x: .Top = y: .Width = 18: .Height = 18
+        .BorderStyle = fmBorderStyleNone
+        .BackStyle = fmBackStyleTransparent
+        .PictureSizeMode = fmPictureSizeModeZoom
+        On Error Resume Next
+        Set .Picture = LoadPicture(bmp)
+    End With
+End Sub
+
+Private Sub PosicionarNoMouse()
+    Dim p As PONTO, dpi As Long
+    #If VBA7 Then
+        Dim dc As LongPtr
+    #Else
+        Dim dc As Long
+    #End If
+    On Error Resume Next
+    GetCursorPos p
+    dc = GetDC(0)
+    dpi = GetDeviceCaps(dc, 88)
+    ReleaseDC 0, dc
+    If dpi <= 0 Then dpi = 96
+    Me.StartUpPosition = 0
+    Me.Left = p.X * 72 / dpi - 10
+    Me.Top = p.Y * 72 / dpi + 8
+End Sub
+
+Private Sub Destacar(ByVal k As Long)
+    Dim i As Long
+    For i = 1 To nItens
+        If i = k Then
+            fundo(i).BackColor = COR_HOVER
+        Else
+            If fundo(i).BackColor <> COR_FUNDO Then fundo(i).BackColor = COR_FUNDO
+        End If
+    Next
+End Sub
+
+Private Sub Escolher(ByVal k As Long)
+    gMenuEscolha = k
+    Me.Hide
+End Sub
+
+Private Sub UserForm_MouseMove(ByVal Button As Integer, ByVal Shift As Integer, ByVal X As Single, ByVal Y As Single)
+    If gModo = 2 Then Destacar 0
+End Sub
+
+Private Sub m1_Click()
+    Escolher 1
+End Sub
+Private Sub m2_Click()
+    Escolher 2
+End Sub
+Private Sub m3_Click()
+    Escolher 3
+End Sub
+Private Sub m4_Click()
+    Escolher 4
+End Sub
+Private Sub m5_Click()
+    Escolher 5
+End Sub
+Private Sub m6_Click()
+    Escolher 6
+End Sub
+Private Sub m7_Click()
+    Escolher 7
+End Sub
+Private Sub m8_Click()
+    Escolher 8
+End Sub
+Private Sub m9_Click()
+    Escolher 9
+End Sub
+Private Sub m10_Click()
+    Escolher 10
+End Sub
+Private Sub m1_MouseMove(ByVal Button As Integer, ByVal Shift As Integer, ByVal X As Single, ByVal Y As Single)
+    Destacar 1
+End Sub
+Private Sub m2_MouseMove(ByVal Button As Integer, ByVal Shift As Integer, ByVal X As Single, ByVal Y As Single)
+    Destacar 2
+End Sub
+Private Sub m3_MouseMove(ByVal Button As Integer, ByVal Shift As Integer, ByVal X As Single, ByVal Y As Single)
+    Destacar 3
+End Sub
+Private Sub m4_MouseMove(ByVal Button As Integer, ByVal Shift As Integer, ByVal X As Single, ByVal Y As Single)
+    Destacar 4
+End Sub
+Private Sub m5_MouseMove(ByVal Button As Integer, ByVal Shift As Integer, ByVal X As Single, ByVal Y As Single)
+    Destacar 5
+End Sub
+Private Sub m6_MouseMove(ByVal Button As Integer, ByVal Shift As Integer, ByVal X As Single, ByVal Y As Single)
+    Destacar 6
+End Sub
+Private Sub m7_MouseMove(ByVal Button As Integer, ByVal Shift As Integer, ByVal X As Single, ByVal Y As Single)
+    Destacar 7
+End Sub
+Private Sub m8_MouseMove(ByVal Button As Integer, ByVal Shift As Integer, ByVal X As Single, ByVal Y As Single)
+    Destacar 8
+End Sub
+Private Sub m9_MouseMove(ByVal Button As Integer, ByVal Shift As Integer, ByVal X As Single, ByVal Y As Single)
+    Destacar 9
+End Sub
+Private Sub m10_MouseMove(ByVal Button As Integer, ByVal Shift As Integer, ByVal X As Single, ByVal Y As Single)
+    Destacar 10
+End Sub
+
+'==============================================================================
+'  JANELA DE PARÂMETROS
+'==============================================================================
+Private Sub MontarJanela()
+    Dim i As Long, y As Single, larg As Single, k As Long, v As Variant
+    Dim lb As MSForms.Label, tb As MSForms.TextBox, sp As MSForms.SpinButton
+    Dim ck As MSForms.CheckBox, cb As MSForms.ComboBox, fr As MSForms.Label
+    Me.Caption = "LT Tools - " & gTit & IIf(gConfig, "  (definir valores padrão)", "")
+    Me.BackColor = &HF3F3F3
+    dx = 0
+    If gPreview Then
+        dx = 560
+        Set imgPrev = Me.Controls.Add("Forms.Image.1", "imgPrev")
+        With imgPrev
+            .Left = 10: .Top = 10: .Width = 540: .Height = 370
+            .BorderStyle = fmBorderStyleSingle: .BorderColor = &HC8C8C8
+            .PictureSizeMode = fmPictureSizeModeZoom
+            .BackColor = &HEBEBEB
+        End With
+        Set lblInfo = Me.Controls.Add("Forms.Label.1", "lblInfo")
+        With lblInfo
+            .Left = 10: .Top = 386: .Width = 540: .Height = 30
+            .Font.Name = "Segoe UI": .Font.Size = 9: .WordWrap = True
+            .BackStyle = fmBackStyleTransparent
+            .Caption = "Calculando o encaixe..."
+        End With
+    End If
+    larg = 340
+    y = 10
+    MontarPredefinicoes y
+    y = y + 28
+    If Len(gDica) > 0 Then
+        Set lb = Me.Controls.Add("Forms.Label.1")
+        With lb
+            .Left = dx + 10: .Top = y: .Width = larg - 20: .Height = 26
+            .Caption = gDica: .WordWrap = True
+            .Font.Name = "Segoe UI": .Font.Size = 8
+            .ForeColor = &H606060
+        End With
+        y = y + 30
+    End If
+    ' fundo branco dos campos (como o painel do eCut)
+    Set fr = Me.Controls.Add("Forms.Label.1")
+    fr.Left = dx + 8: fr.Top = y - 4: fr.Width = larg - 16
+    fr.BackColor = COR_FUNDO: fr.BackStyle = fmBackStyleOpaque
+    fr.BorderStyle = fmBorderStyleSingle: fr.BorderColor = &HDDDDDD
+    k = 0
+    For i = 1 To gN
+        Select Case gTipo(i)
+            Case 1      ' número com setas
+                Rotulo gRot(i), y, larg - 140
+                Set tb = Me.Controls.Add("Forms.TextBox.1")
+                With tb
+                    .Left = dx + larg - 122: .Top = y: .Width = 82: .Height = 18
+                    .Text = gVal(i): .TextAlign = fmTextAlignRight
+                    .Font.Name = "Segoe UI": .Font.Size = 9
+                    .SpecialEffect = fmSpecialEffectFlat: .BorderStyle = fmBorderStyleSingle: .BorderColor = &HC8C8C8
+                End With
+                Set ctl(i) = tb
+                Set sp = Me.Controls.Add("Forms.SpinButton.1")
+                sp.Left = dx + larg - 39: sp.Top = y: sp.Width = 13: sp.Height = 18
+                passo(i) = PassoDe(gVal(i))
+                k = k + 1
+                LigarSpin k, sp, i
+                y = y + 24
+            Case 2      ' sim / não
+                Set ck = Me.Controls.Add("Forms.CheckBox.1")
+                With ck
+                    .Left = dx + 16: .Top = y: .Width = larg - 40: .Height = 18
+                    .Caption = gRot(i): .Value = (gVal(i) = "1")
+                    .Font.Name = "Segoe UI": .Font.Size = 9
+                    .BackStyle = fmBackStyleTransparent
+                End With
+                Set ctl(i) = ck
+                y = y + 24
+            Case 3      ' lista
+                Rotulo gRot(i), y, 165
+                Set cb = Me.Controls.Add("Forms.ComboBox.1")
+                With cb
+                    .Left = dx + 184: .Top = y: .Width = larg - 210: .Height = 18
+                    .Style = fmStyleDropDownList
+                    .Font.Name = "Segoe UI": .Font.Size = 9
+                    For Each v In Split(gOpc(i), "|")
+                        .AddItem v
+                    Next
+                    If Val(gVal(i)) >= 1 And Val(gVal(i)) <= .ListCount Then .ListIndex = Val(gVal(i)) - 1 Else .ListIndex = 0
+                End With
+                Set ctl(i) = cb
+                y = y + 24
+            Case 4      ' texto (ex.: caminho de arquivo)
+                Rotulo gRot(i), y, larg - 40
+                y = y + 16
+                Set tb = Me.Controls.Add("Forms.TextBox.1")
+                With tb
+                    .Left = dx + 16: .Top = y: .Width = larg - 42: .Height = 18
+                    .Text = gVal(i)
+                    .Font.Name = "Segoe UI": .Font.Size = 9
+                    .SpecialEffect = fmSpecialEffectFlat: .BorderStyle = fmBorderStyleSingle: .BorderColor = &HC8C8C8
+                End With
+                Set ctl(i) = tb
+                y = y + 26
+        End Select
+    Next
+    fr.Height = y - fr.Top + 2
+    fr.ZOrder 1          ' manda o fundo branco para trás
+    y = y + 12
+    Set bOK = Me.Controls.Add("Forms.CommandButton.1", "btnOK")
+    bOK.Caption = IIf(gConfig, "Salvar padrão", "OK"): bOK.Left = dx + larg - 178: bOK.Top = y: bOK.Width = 80: bOK.Height = 24
+    bOK.Default = True
+    Set bCanc = Me.Controls.Add("Forms.CommandButton.1", "btnCanc")
+    bCanc.Caption = "Cancelar": bCanc.Left = dx + larg - 90: bCanc.Top = y: bCanc.Width = 80: bCanc.Height = 24
+    bCanc.Cancel = True
+    If gPreview Then
+        Set bVer = Me.Controls.Add("Forms.CommandButton.1", "btnVer")
+        bVer.Caption = "Visualizar": bVer.Left = dx + larg - 266: bVer.Top = y: bVer.Width = 80: bVer.Height = 24
+        bVer.Font.Name = "Segoe UI": bVer.Font.Size = 9
+    End If
+    y = y + 34
+    If gPreview And y < 426 Then y = 426
+    Me.Width = dx + larg + (Me.Width - Me.InsideWidth)
+    Me.Height = y + (Me.Height - Me.InsideHeight)
+End Sub
+
+Private Sub Rotulo(ByVal txt As String, ByVal y As Single, ByVal w As Single)
+    Dim lb As MSForms.Label
+    Set lb = Me.Controls.Add("Forms.Label.1")
+    With lb
+        .Left = dx + 16: .Top = y + 2: .Width = w: .Height = 16
+        .Caption = txt
+        .Font.Name = "Segoe UI": .Font.Size = 9
+        .BackStyle = fmBackStyleTransparent
+    End With
+End Sub
+
+Private Function Numero(ByVal s As String, ByRef v As Double) As Boolean
+    Dim sep As String
+    sep = Mid$(CStr(1.5), 2, 1)
+    s = Replace(Replace(Trim$(s), ",", sep), ".", sep)
+    If Len(s) = 0 Or Not IsNumeric(s) Then Exit Function
+    v = CDbl(s)
+    Numero = True
+End Function
+
+Private Function PassoDe(ByVal s As String) As Double
+    Dim v As Double
+    If Not Numero(s, v) Then PassoDe = 1: Exit Function
+    v = Abs(v)
+    If v = 0 Or v >= 1 And v = Int(v) Then
+        PassoDe = 1
+    ElseIf v < 0.1 Then
+        PassoDe = 0.01
+    Else
+        PassoDe = 0.1
+    End If
+End Function
+
+Private Sub LigarSpin(ByVal k As Long, sp As MSForms.SpinButton, ByVal campo As Long)
+    sp.Tag = CStr(campo)
+    Select Case k
+        Case 1: Set s1 = sp
+        Case 2: Set s2 = sp
+        Case 3: Set s3 = sp
+        Case 4: Set s4 = sp
+        Case 5: Set s5 = sp
+        Case 6: Set s6 = sp
+        Case 7: Set s7 = sp
+        Case 8: Set s8 = sp
+        Case 9: Set s9 = sp
+        Case 10: Set s10 = sp
+    End Select
+End Sub
+
+Private Sub Girar(sp As MSForms.SpinButton, ByVal dirc As Double)
+    Dim i As Long, v As Double
+    i = CLng(sp.Tag)
+    If Not Numero(ctl(i).Text, v) Then v = 0
+    v = Round(v + dirc * passo(i), 4)
+    If v < 0 Then v = 0
+    ctl(i).Text = CStr(v)
+End Sub
+
+Private Sub s1_SpinUp()
+    Girar s1, 1
+End Sub
+Private Sub s1_SpinDown()
+    Girar s1, -1
+End Sub
+Private Sub s2_SpinUp()
+    Girar s2, 1
+End Sub
+Private Sub s2_SpinDown()
+    Girar s2, -1
+End Sub
+Private Sub s3_SpinUp()
+    Girar s3, 1
+End Sub
+Private Sub s3_SpinDown()
+    Girar s3, -1
+End Sub
+Private Sub s4_SpinUp()
+    Girar s4, 1
+End Sub
+Private Sub s4_SpinDown()
+    Girar s4, -1
+End Sub
+Private Sub s5_SpinUp()
+    Girar s5, 1
+End Sub
+Private Sub s5_SpinDown()
+    Girar s5, -1
+End Sub
+Private Sub s6_SpinUp()
+    Girar s6, 1
+End Sub
+Private Sub s6_SpinDown()
+    Girar s6, -1
+End Sub
+Private Sub s7_SpinUp()
+    Girar s7, 1
+End Sub
+Private Sub s7_SpinDown()
+    Girar s7, -1
+End Sub
+Private Sub s8_SpinUp()
+    Girar s8, 1
+End Sub
+Private Sub s8_SpinDown()
+    Girar s8, -1
+End Sub
+Private Sub s9_SpinUp()
+    Girar s9, 1
+End Sub
+Private Sub s9_SpinDown()
+    Girar s9, -1
+End Sub
+Private Sub s10_SpinUp()
+    Girar s10, 1
+End Sub
+Private Sub s10_SpinDown()
+    Girar s10, -1
+End Sub
+
+Private Sub bOK_Click()
+    If gModo = 2 Then Exit Sub
+    If Not LerCampos() Then Exit Sub
+    gOK = True
+    Me.Hide
+End Sub
+
+Private Sub bVer_Click()
+    RecalcularPrevia
+End Sub
+
+Private Sub UserForm_Activate()
+    If gModo = 1 And gPreview And Not jaAtivou Then
+        jaAtivou = True
+        RecalcularPrevia
+    End If
+End Sub
+
+Private Sub RecalcularPrevia()
+    If Not LerCampos() Then Exit Sub
+    lblInfo.Caption = "Calculando o encaixe..."
+    Me.Repaint
+    DoEvents
+    LTTools.NzPrevia
+    On Error Resume Next
+    If Len(gPrevArq) > 0 Then Set imgPrev.Picture = LoadPicture(gPrevArq)
+    lblInfo.Caption = gPrevInfo
+End Sub
+
+' lê e confere os campos (números válidos) e guarda em gVal
+Private Function LerCampos() As Boolean
+    Dim i As Long, v As Double
+    For i = 1 To gN
+        Select Case gTipo(i)
+            Case 1
+                If Not Numero(ctl(i).Text, v) Then
+                    MsgBox "Valor inválido em: " & gRot(i), vbExclamation, "LT Tools"
+                    ctl(i).SetFocus
+                    Exit Function
+                End If
+                gVal(i) = Trim$(ctl(i).Text)
+            Case 2
+                gVal(i) = IIf(ctl(i).Value, "1", "0")
+            Case 3
+                gVal(i) = CStr(ctl(i).ListIndex + 1)
+            Case 4
+                gVal(i) = ctl(i).Text
+        End Select
+    Next
+    LerCampos = True
+End Function
+
+Private Sub bCanc_Click()
+    gOK = False
+    gMenuEscolha = 0
+    Me.Hide
+End Sub
+
+'==============================================================================
+'  PREDEFINIÇÕES (salvar / carregar conjuntos de valores)
+'==============================================================================
+Private Sub MontarPredefinicoes(ByVal y As Single)
+    Dim lb As MSForms.Label
+    Set lb = Me.Controls.Add("Forms.Label.1")
+    With lb
+        .Left = dx + 10: .Top = y + 3: .Width = 66: .Height = 16
+        .Caption = "Predefinição:"
+        .Font.Name = "Segoe UI": .Font.Size = 8
+        .BackStyle = fmBackStyleTransparent
+    End With
+    Set cbPre = Me.Controls.Add("Forms.ComboBox.1")
+    With cbPre
+        .Left = dx + 76: .Top = y: .Width = 124: .Height = 18
+        .Style = fmStyleDropDownList
+        .Font.Name = "Segoe UI": .Font.Size = 8
+    End With
+    Set bSalvarPre = NovoBotao("Salvar", 203, y, 44)
+    Set bExcluirPre = NovoBotao("Excluir", 249, y, 44)
+    Set bPadraoPre = NovoBotao("Padrão", 295, y, 38)
+    bSalvarPre.ControlTipText = "Salvar os valores atuais com um nome"
+    bExcluirPre.ControlTipText = "Excluir a predefinição escolhida"
+    bPadraoPre.ControlTipText = "Usar os valores atuais sempre que esta janela abrir"
+    PreencherLista ""
+End Sub
+
+Private Function NovoBotao(ByVal cap As String, ByVal x As Single, ByVal y As Single, ByVal w As Single) As MSForms.CommandButton
+    Dim b As MSForms.CommandButton
+    Set b = Me.Controls.Add("Forms.CommandButton.1")
+    b.Caption = cap: b.Left = dx + x: b.Top = y: b.Width = w: b.Height = 19
+    b.Font.Name = "Segoe UI": b.Font.Size = 8
+    b.TakeFocusOnClick = False
+    Set NovoBotao = b
+End Function
+
+Private Function Chave() As String
+    Chave = "Pre_" & gTit
+End Function
+
+Private Sub PreencherLista(ByVal selecionar As String)
+    Dim v As Variant, i As Long
+    carregando = True
+    cbPre.Clear
+    cbPre.AddItem "(último usado)"
+    cbPre.AddItem "(valores de fábrica)"
+    If Len(GetSetting("LTTools", Chave(), "_padrao", "")) > 0 Then cbPre.AddItem "(padrão)"
+    For Each v In Split(GetSetting("LTTools", Chave(), "_lista", ""), "|")
+        If Len(v) > 0 Then cbPre.AddItem v
+    Next
+    If Len(selecionar) > 0 Then
+        For i = 0 To cbPre.ListCount - 1
+            If cbPre.List(i) = selecionar Then cbPre.ListIndex = i: Exit For
+        Next
+    End If
+    carregando = False
+End Sub
+
+Private Sub cbPre_Change()
+    If carregando Or cbPre.ListIndex < 0 Then Exit Sub
+    Select Case cbPre.Text
+        Case "(último usado)": AplicarLista gUlt
+        Case "(valores de fábrica)": AplicarLista gFab
+        Case "(padrão)": AplicarTexto GetSetting("LTTools", Chave(), "_padrao", "")
+        Case Else: AplicarTexto GetSetting("LTTools", Chave(), "P_" & cbPre.Text, "")
+    End Select
+End Sub
+
+Private Sub AplicarLista(arr() As String)
+    Dim i As Long
+    For i = 1 To gN
+        AplicarValor i, arr(i)
+    Next
+End Sub
+
+Private Sub AplicarTexto(ByVal s As String)
+    Dim p As Variant, i As Long
+    If Len(s) = 0 Then Exit Sub
+    p = Split(s, vbTab)
+    For i = 1 To gN
+        If i - 1 <= UBound(p) Then AplicarValor i, CStr(p(i - 1))
+    Next
+End Sub
+
+Private Sub AplicarValor(ByVal i As Long, ByVal v As String)
+    On Error Resume Next
+    Select Case gTipo(i)
+        Case 1, 4: ctl(i).Text = v
+        Case 2: ctl(i).Value = (v = "1")
+        Case 3
+            If Val(v) >= 1 And Val(v) <= ctl(i).ListCount Then ctl(i).ListIndex = Val(v) - 1
+    End Select
+End Sub
+
+Private Function ValorAtual(ByVal i As Long) As String
+    Select Case gTipo(i)
+        Case 1, 4: ValorAtual = Trim$(ctl(i).Text)
+        Case 2: ValorAtual = IIf(ctl(i).Value, "1", "0")
+        Case 3: ValorAtual = CStr(ctl(i).ListIndex + 1)
+    End Select
+End Function
+
+Private Function LerValores() As String
+    Dim i As Long, s As String
+    For i = 1 To gN
+        s = s & IIf(i > 1, vbTab, "") & ValorAtual(i)
+    Next
+    LerValores = s
+End Function
+
+Private Sub bSalvarPre_Click()
+    Dim nome As String, lst As String, sug As String
+    If cbPre.ListIndex >= 0 Then
+        If Left$(cbPre.Text, 1) <> "(" Then sug = cbPre.Text
+    End If
+    nome = Trim$(InputBox("Nome da predefinição (ex.: Acrílico 3 mm):", "LT Tools - " & gTit, sug))
+    If Len(nome) = 0 Then Exit Sub
+    nome = Replace(nome, "|", "-")
+    If Left$(nome, 1) = "(" Then nome = Mid$(nome, 2)
+    SaveSetting "LTTools", Chave(), "P_" & nome, LerValores()
+    lst = GetSetting("LTTools", Chave(), "_lista", "")
+    If InStr("|" & lst & "|", "|" & nome & "|") = 0 Then
+        lst = IIf(Len(lst) = 0, nome, lst & "|" & nome)
+        SaveSetting "LTTools", Chave(), "_lista", lst
+    End If
+    PreencherLista nome
+End Sub
+
+Private Sub bExcluirPre_Click()
+    Dim nome As String, v As Variant, novo As String
+    If cbPre.ListIndex < 0 Then
+        MsgBox "Escolha na lista a predefinição que quer excluir.", vbInformation, "LT Tools"
+        Exit Sub
+    End If
+    nome = cbPre.Text
+    If nome = "(padrão)" Then
+        If MsgBox("Remover o padrão desta janela? (ela volta a abrir com os últimos valores usados)", vbQuestion + vbYesNo, "LT Tools") <> vbYes Then Exit Sub
+        On Error Resume Next
+        DeleteSetting "LTTools", Chave(), "_padrao"
+        On Error GoTo 0
+        PreencherLista ""
+        Exit Sub
+    End If
+    If Left$(nome, 1) = "(" Then
+        MsgBox "Esta opção não pode ser excluída.", vbInformation, "LT Tools"
+        Exit Sub
+    End If
+    If MsgBox("Excluir a predefinição """ & nome & """?", vbQuestion + vbYesNo, "LT Tools") <> vbYes Then Exit Sub
+    On Error Resume Next
+    DeleteSetting "LTTools", Chave(), "P_" & nome
+    On Error GoTo 0
+    For Each v In Split(GetSetting("LTTools", Chave(), "_lista", ""), "|")
+        If Len(v) > 0 And v <> nome Then novo = IIf(Len(novo) = 0, v, novo & "|" & v)
+    Next
+    SaveSetting "LTTools", Chave(), "_lista", novo
+    PreencherLista ""
+End Sub
+
+Private Sub bPadraoPre_Click()
+    SaveSetting "LTTools", Chave(), "_padrao", LerValores()
+    PreencherLista "(padrão)"
+    MsgBox "Pronto! Esta janela vai abrir sempre com estes valores.", vbInformation, "LT Tools"
+End Sub
