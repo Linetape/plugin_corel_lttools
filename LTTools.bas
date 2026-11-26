@@ -17,7 +17,7 @@ Attribute VB_Name = "LTTools"
 Option Explicit
 
 Private Const TITULO As String = "LT Tools"
-Public Const LT_VERSAO As String = "2.5"
+Public Const LT_VERSAO As String = "2.6"
 Private Const PI As Double = 3.14159265358979
 Private Const AMOSTRAS As Long = 12      ' pontos por segmento de curva (precisão)
 
@@ -199,8 +199,74 @@ End Sub
 
 ' chamado automaticamente quando o CorelDRAW abre (ThisMacroStorage)
 Public Sub LT_IniciarBarra()
+    On Error Resume Next
+    TrocarAtualizador
+    On Error GoTo 0
     InstalarBarraInterno True
 End Sub
+
+' Ao abrir o CorelDRAW: se o LTUpdate.bas da pasta for mais novo que o módulo
+' LTUpdate instalado (constante UPD_VERSAO), troca o código do módulo e salva.
+' (o atualizador não consegue trocar a si mesmo enquanto está rodando)
+Private Sub TrocarAtualizador()
+    Dim app As Object, proj As Object, comp As Object, arq As String, txt As String
+    Dim vArq As Long, vInst As Long, p As Long, c As Object
+    On Error GoTo Fim
+    arq = PastaLTTools() & "LTUpdate.bas"
+    If Len(Dir$(arq)) = 0 Then Exit Sub
+    txt = LerTextoArq(arq)
+    vArq = NumConst(txt, "UPD_VERSAO")
+    If vArq = 0 Then Exit Sub
+    Set app = Application
+    Set proj = app.VBE.VBProjects(ProjetoLT())
+    Set comp = proj.VBComponents("LTUpdate")
+    With comp.CodeModule
+        If .CountOfDeclarationLines > 0 Then vInst = NumConst(.Lines(1, .CountOfDeclarationLines), "UPD_VERSAO")
+        If vArq <= vInst Then Exit Sub
+        ' tira as linhas "Attribute ..." do arquivo exportado
+        Do While Left$(txt, 10) = "Attribute "
+            p = InStr(txt, vbLf)
+            If p = 0 Then Exit Do
+            txt = Mid$(txt, p + 1)
+        Loop
+        .DeleteLines 1, .CountOfLines
+        .AddFromString txt
+    End With
+    Set app.VBE.ActiveVBProject = proj
+    Set c = app.VBE.CommandBars.FindControl(, 3)    ' Salvar
+    If Not c Is Nothing Then c.Execute
+Fim:
+End Sub
+
+Private Function NumConst(ByVal txt As String, ByVal nome As String) As Long
+    Dim p As Long, q As Long
+    p = InStr(1, txt, nome & " As String = """, vbTextCompare)
+    If p = 0 Then Exit Function
+    p = p + Len(nome & " As String = """)
+    q = InStr(p, txt, """")
+    If q > p Then NumConst = Val(Mid$(txt, p, q - p))
+End Function
+
+Private Function LerTextoArq(ByVal arq As String) As String
+    Dim f As Integer, s As String
+    f = FreeFile
+    Open arq For Binary Access Read As #f
+    s = Space$(LOF(f))
+    Get #f, , s
+    Close #f
+    LerTextoArq = s
+End Function
+
+Private Function PastaLTTools() As String
+    Dim p As String
+    p = GetSetting("LTTools", "Config", "Icones", "")
+    If Len(p) > 0 Then
+        If Right$(p, 1) <> "\" Then p = p & "\"
+        p = Left$(p, InStrRev(Left$(p, Len(p) - 1), "\"))
+        If Len(Dir$(p & "LTUpdate.bas")) > 0 Then PastaLTTools = p: Exit Function
+    End If
+    PastaLTTools = Environ$("USERPROFILE") & "\Documents\Corel\Corel Content\LTTools\"
+End Function
 
 ' chamado quando uma janela/documento é ativado: o Corel já terminou de montar as
 ' barras, então os ícones aplicados aqui não são substituídos (1 vez por sessão)

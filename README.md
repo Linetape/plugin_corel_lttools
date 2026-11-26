@@ -21,8 +21,9 @@ Clique no botão **Atualizar** (ícone verde) da barra. Ele lê `versao.txt` des
 1. Altere `LTTools.bas` / `frmLT_codigo.txt` (arquivos em **Windows-1252, CRLF** — não converter para UTF-8).
 2. Suba a constante `LT_VERSAO` em `LTTools.bas` e o número em `versao.txt` (os dois iguais).
 3. Ícones novos: gere com `ferramentas/icones.py`, coloque em `icones/` e inclua em `arquivos.txt`.
-4. Faça o commit/push na `main`. Os CorelDRAW instalados recebem ao clicar em **Atualizar**.
-5. (Opcional) Gere o instalador novo: atualize o Corel, feche-o e rode `instalador/build.bat`.
+4. Mudou o `LTUpdate.bas`? Suba também a constante `UPD_VERSAO` nele: o Corel troca o atualizador sozinho na próxima abertura.
+5. Faça o commit/push na `main`. Os CorelDRAW instalados recebem ao clicar em **Atualizar**.
+6. (Opcional) Gere o instalador novo: atualize o Corel, feche-o e rode `instalador/build.bat`.
 
 ## Estrutura
 

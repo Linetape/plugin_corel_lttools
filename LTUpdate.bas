@@ -8,6 +8,7 @@ Attribute VB_Name = "LTUpdate"
 Option Explicit
 
 Private Const T As String = "LT Tools - Atualizar"
+Public Const UPD_VERSAO As String = "2"     ' suba este número quando mudar este módulo
 Private Const GITHUB_RAW As String = "https://raw.githubusercontent.com/Linetape/plugin_corel_lttools/main/"
 
 '------------------------------------------------------------------------------
@@ -73,8 +74,11 @@ Private Function BaixarDoGitHub(ByVal pasta As String, ByRef erro As String) As 
         nome = Trim$(linhas(i))
         If Len(nome) > 0 And Left$(nome, 1) <> "#" Then
             If Not BaixarArquivo(GITHUB_RAW & nome, pasta & Replace(nome, "/", "\")) Then
-                erro = "falhou ao baixar " & nome
-                Exit Function
+                ' ícone em uso pela barra (o Corel deixa o arquivo aberto): mantém o que já existe
+                If Not (LCase$(Left$(nome, 7)) = "icones/" And Len(Dir$(pasta & Replace(nome, "/", "\"))) > 0) Then
+                    erro = "falhou ao baixar " & nome
+                    Exit Function
+                End If
             End If
             n = n + 1
         End If
